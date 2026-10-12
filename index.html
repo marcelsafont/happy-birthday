@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Pingüí Aniversari</title>
+<title>Happy birthday Natalie</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -57,11 +57,10 @@
 <body>
 <div class="wrap">
   <div class="game-card">
-    <h1>PINGÜÍ ANIVERSARI</h1>
+    <h1>Happy birthday Natalie</h1>
     <canvas id="game" width="1000" height="420"></canvas>
     <div class="hud">
       <span>Punts: <b id="score">0</b> / <span id="goal">100</span></span>
-      <span>Rècord: <b id="best">0</b></span>
     </div>
     <div class="hint">ESPAI / CLIC / TOC per saltar</div>
   </div>
@@ -72,7 +71,6 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const scoreEl = document.getElementById('score');
-  const bestEl = document.getElementById('best');
   const W = canvas.width;
   const H = canvas.height;
 
@@ -89,7 +87,6 @@
   let clouds;
   let snowflakes;
   let score;
-  let best = Number(localStorage.getItem('penguin-best') || 0);
   let speed;
   let frame;
   let running;
@@ -97,15 +94,13 @@
   let wonByScore;
   let messageAlpha;
 
-  bestEl.textContent = best;
-
   function reset() {
     penguin = { x: 90, y: GROUND_Y, vy: 0, w: 60, h: 76, jumpCount: 0, runPhase: 0 };
     obstacles = [];
     clouds = [];
     snowflakes = [];
     score = 0;
-    speed = 3.5;
+    speed = 5;
     frame = 0;
     running = true;
     finished = false;
@@ -576,9 +571,9 @@ if (wonByScore) {
     penguin.runPhase += 0.35;
 
     const last = obstacles[obstacles.length - 1];
-    const minGap = 240;
+    const minGap = 210;
     const farEnough = !last || last.x < W - minGap;
-    if (frame % Math.max(85, 130 - score / 3) === 0 && farEnough) spawnObstacle();
+    if (frame % Math.max(70, 110 - score / 3) === 0 && farEnough) spawnObstacle();
 
     for (const o of obstacles) o.x -= speed;
     while (obstacles.length && obstacles[0].x + obstacles[0].w < -20) {
@@ -598,7 +593,7 @@ if (wonByScore) {
       if (s.x < -5) s.x = W;
     }
 
-    speed = 3.5 + score / 150;
+    speed = 5 + score / 120;
     scoreEl.textContent = score;
 
     // win: reach WIN_SCORE
@@ -620,11 +615,6 @@ if (wonByScore) {
       }
     }
 
-    if (finished && score > best) {
-      best = score;
-      localStorage.setItem('penguin-best', best);
-      bestEl.textContent = best;
-    }
   }
 
   function loop() {
