@@ -37,11 +37,11 @@
   canvas {
     display: block;
     width: 100%;
-    height: auto;
     max-width: 1000px;
     background: linear-gradient(to bottom, #87ceeb 0%, #b0e0e6 70%, #fff 100%);
     border-radius: 8px;
     cursor: pointer;
+    touch-action: manipulation;
   }
   .hud {
     display: flex;
@@ -71,13 +71,32 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const scoreEl = document.getElementById('score');
-  const W = canvas.width;
-  const H = canvas.height;
+  const W = 1000;
+  const H = 420;
 
   const GROUND_Y = H - 80;
   const GRAVITY = 0.55;
   const JUMP_V = -13;
   const WIN_SCORE = 100;
+
+  let cssW = W;
+  let cssH = H;
+
+  function fitCanvas() {
+    const parent = canvas.parentElement;
+    const ps = parent ? getComputedStyle(parent) : null;
+    const padX = ps ? (parseFloat(ps.paddingLeft) || 0) + (parseFloat(ps.paddingRight) || 0) : 0;
+    const available = Math.max(0, (parent ? parent.clientWidth : W) - padX);
+    cssW = Math.max(280, Math.min(W, available));
+    cssH = cssW * (H / W);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    const s = cssW / W;
+    ctx.setTransform(dpr * s, 0, 0, dpr * s, 0, 0);
+  }
 
   const goalEl = document.getElementById('goal');
   if (goalEl) goalEl.textContent = WIN_SCORE;
@@ -504,14 +523,19 @@
   function drawBirthday() {
     if (messageAlpha <= 0) return;
     ctx.save();
-    ctx.fillStyle = `rgba(0, 0, 0, ${0.55 * messageAlpha})`;
+
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.75 * messageAlpha})`;
     ctx.fillRect(0, 0, W, H);
+
+    const pulse = 0.6 + Math.sin(frame / 8) * 0.4;
+    ctx.strokeStyle = `rgba(233, 69, 96, ${messageAlpha * pulse})`;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(8, 8, W - 16, H - 16);
 
     const cx = W / 2, cy = H / 2;
     const scale = 1 + (1 - messageAlpha) * 0.4;
 
     if (wonByScore) {
-      // confetti only on win
       for (let i = 0; i < 30; i++) {
         const a = (frame / 30 + i) % (Math.PI * 2);
         const rx = cx + Math.cos(a + i) * 180;
@@ -528,31 +552,34 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-if (wonByScore) {
+    if (wonByScore) {
       ctx.fillStyle = `rgba(233, 69, 96, ${0.5 * messageAlpha})`;
-      ctx.font = 'bold 72px -apple-system, sans-serif';
+      ctx.font = 'bold 84px -apple-system, sans-serif';
       ctx.fillText('FELIÇ ANIVERSARI', 4, 4);
       ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha})`;
       ctx.fillText('FELIÇ ANIVERSARI', 0, 0);
 
-      ctx.font = '26px -apple-system, sans-serif';
-      ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.9})`;
-      ctx.fillText('ho has aconseguit! 🎉', 0, -60);
+      ctx.font = '30px -apple-system, sans-serif';
+      ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.95})`;
+      ctx.fillText('ho has aconseguit! 🎉', 0, -68);
     } else {
       ctx.fillStyle = `rgba(233, 69, 96, ${0.5 * messageAlpha})`;
-      ctx.font = 'bold 68px -apple-system, sans-serif';
-      ctx.fillText('oh no! game over 😢', 4, -4);
+      ctx.font = 'bold 84px -apple-system, sans-serif';
+      ctx.fillText('GAME OVER', 4, -4);
       ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha})`;
-      ctx.fillText('oh no! game over 😢', 0, -8);
+      ctx.fillText('GAME OVER', 0, -8);
 
-      ctx.font = '24px -apple-system, sans-serif';
-      ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.9})`;
-      ctx.fillText('el pinguí està trist', 0, 32);
+      ctx.font = '28px -apple-system, sans-serif';
+      ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.95})`;
+      ctx.fillText('el pinguí ha xocat', 0, 38);
     }
 
-    ctx.font = '18px -apple-system, sans-serif';
-    ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.85})`;
-    ctx.fillText('clica / toca / espai per tornar a jugar', 0, 60);
+    const restartPulse = 0.55 + Math.sin(frame / 7) * 0.45;
+    ctx.font = 'bold 26px -apple-system, sans-serif';
+    ctx.fillStyle = `rgba(233, 69, 96, ${messageAlpha})`;
+    ctx.globalAlpha = messageAlpha * restartPulse;
+    ctx.fillText('▶  TOCA PER REINICIAR  ◀', 0, 100);
+    ctx.globalAlpha = 1;
 
     ctx.restore();
   }
@@ -656,6 +683,15 @@ if (wonByScore) {
   canvas.addEventListener('mousedown', jump);
   canvas.addEventListener('touchstart', (e) => { e.preventDefault(); jump(); }, { passive: false });
 
+  fitCanvas();
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(fitCanvas, 100);
+  });
+  window.addEventListener('orientationchange', () => {
+    setTimeout(fitCanvas, 200);
+  });
   reset();
   loop();
 })();
