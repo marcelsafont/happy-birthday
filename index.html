@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pingüí Aniversari</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #1a1a2e;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #fff;
+    overflow: hidden;
+    user-select: none;
+  }
+  .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 20px;
+  }
+  .game-card {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    max-width: 100%;
+  }
+  h1 {
+    font-size: 18px;
+    text-align: center;
+    margin-bottom: 12px;
+    color: #e94560;
+    letter-spacing: 2px;
+  }
+  canvas {
+    display: block;
+    background: linear-gradient(to bottom, #87ceeb 0%, #b0e0e6 70%, #fff 100%);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    font-size: 14px;
+    color: #aaa;
+  }
+  .hud span b { color: #fff; }
+  .hint { text-align: center; font-size: 12px; color: #888; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="game-card">
+    <h1>PINGÜÍ ANIVERSARI</h1>
+    <canvas id="game" width="800" height="300"></canvas>
+    <div class="hud">
+      <span>Punts: <b id="score">0</b> / <span id="goal">100</span></span>
+      <span>Rècord: <b id="best">0</b></span>
+    </div>
+    <div class="hint">ESPAI / CLIC / TOC per saltar</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const W = canvas.width;
+  const H = canvas.height;
+
+  const GROUND_Y = H - 60;
+  const GRAVITY = 0.6;
+  const JUMP_V = -12;
+  const WIN_SCORE = 100;
+
+  const goalEl = document.getElementById('goal');
+  if (goalEl) goalEl.textContent = WIN_SCORE;
+
+  let penguin;
+  let obstacles;
+  let clouds;
+  let snowflakes;
+  let score;
+  let best = Number(localStorage.getItem('penguin-best') || 0);
+  let speed;
+  let frame;
+  let running;
+  let finished;
+  let wonByScore;
+  let messageAlpha;
+
+  bestEl.textContent = best;
+
+  function reset() {
+    penguin = { x: 80, y: GROUND_Y, vy: 0, w: 44, h: 56, jumpCount: 0, runPhase: 0 };
+    obstacles = [];
+    clouds = [];
+    snowflakes = [];
+    score = 0;
+    speed = 6;
+    frame = 0;
+    running = true;
+    finished = false;
+    wonByScore = false;
+    messageAlpha = 0;
+    for (let i = 0; i < 4; i++) {
+      clouds.push({ x: Math.random() * W, y: 30 + Math.random() * 80, w: 60 + Math.random() * 60 });
+    }
+    for (let i = 0; i < 40; i++) {
+      snowflakes.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: 1 + Math.random() * 2,
+        vy: 0.5 + Math.random() * 1.5,
+        drift: (Math.random() - 0.5) * 0.4
+      });
+    }
+  }
+
+  function spawnObstacle() {
+    const types = ['igloo', 'snowman', 'pine'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    let w, h;
+    if (type === 'igloo') {
+      h = 40 + Math.random() * 24;
+      w = 50 + Math.random() * 18;
+    } else if (type === 'snowman') {
+      h = 50 + Math.random() * 22;
+      w = h * 0.8;
+    } else {
+      h = 54 + Math.random() * 28;
+      w = h * 0.55;
+    }
+    obstacles.push({ x: W + 20, y: GROUND_Y, w, h, type });
+  }
+
+  function jump() {
+    if (finished) {
+      reset();
+      return;
+    }
+    if (penguin.jumpCount < 2) {
+      penguin.vy = JUMP_V * (penguin.jumpCount === 0 ? 1 : 0.85);
+      penguin.jumpCount++;
+    }
+  }
+
+  function rectsOverlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  function drawPenguin(p) {
+    const x = p.x, y = p.y;
+    ctx.save();
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(x + p.w / 2, GROUND_Y + 4, p.w / 2, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // body
+    ctx.fillStyle = '#0a0a0a';
+    ctx.beginPath();
+    ctx.ellipse(x + p.w / 2, y - p.h / 2, p.w / 2, p.h / 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // belly
+    ctx.fillStyle = '#f5f5f5';
+    ctx.beginPath();
+    ctx.ellipse(x + p.w / 2 + 2, y - p.h / 2 + 4, p.w / 3, p.h / 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // head
+    ctx.fillStyle = '#0a0a0a';
+    ctx.beginPath();
+    ctx.arc(x + p.w / 2, y - p.h - 2, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // face
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(x + p.w / 2 + 5, y - p.h - 2, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // eyes (sad X when crashed)
+    const sad = finished && !wonByScore;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1.5;
+    if (sad) {
+      const ex = x + p.w / 2 + 6, ey = y - p.h - 3;
+      ctx.beginPath();
+      ctx.moveTo(ex - 2.5, ey - 2.5); ctx.lineTo(ex + 2.5, ey + 2.5);
+      ctx.moveTo(ex + 2.5, ey - 2.5); ctx.lineTo(ex - 2.5, ey + 2.5);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(x + p.w / 2 + 6, y - p.h - 3, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // frown when sad
+    if (sad) {
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x + p.w / 2 + 12, y - p.h + 6, 6, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.stroke();
+    }
+
+    // beak
+    ctx.fillStyle = '#ff8c00';
+    ctx.beginPath();
+    ctx.moveTo(x + p.w / 2 + 10, y - p.h - 1);
+    ctx.lineTo(x + p.w / 2 + 20, y - p.h + 1);
+    ctx.lineTo(x + p.w / 2 + 10, y - p.h + 3);
+    ctx.closePath();
+    ctx.fill();
+
+    // feet (always anchored to body, so they follow the jump)
+    ctx.fillStyle = '#ff8c00';
+    const onGround = p.y >= GROUND_Y - 0.5;
+    const footBaseY = p.y - 2;
+    const wiggle = Math.sin(p.runPhase);
+    const leftFootY = footBaseY + (onGround ? wiggle * 3 : -6 + wiggle * 4);
+    const rightFootY = footBaseY + (onGround ? -wiggle * 3 : -6 - wiggle * 4);
+    const leftBack = onGround ? wiggle > 0.3 : true;
+    const rightBack = onGround ? wiggle < -0.3 : true;
+    ctx.beginPath();
+    ctx.ellipse(x + p.w / 2 - 8, leftFootY, 7, leftBack ? 4 : 2.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + p.w / 2 + 8, rightFootY, 7, rightBack ? 4 : 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (onGround && Math.abs(wiggle) > 0.7) {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.beginPath();
+      const fx = wiggle > 0 ? x + p.w / 2 - 8 : x + p.w / 2 + 8;
+      ctx.ellipse(fx, GROUND_Y + 3, 5, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // wing
+    ctx.fillStyle = '#222';
+    const wingY = y - p.h / 2 - 4 + Math.sin(frame / 6) * 1.5;
+    ctx.beginPath();
+    ctx.ellipse(x + p.w - 4, wingY, 5, 14, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawObstacle(o) {
+    if (o.type === 'igloo') drawIgloo(o);
+    else if (o.type === 'snowman') drawSnowman(o);
+    else drawPineTree(o);
+  }
+
+  function drawIgloo(i) {
+    const x = i.x, y = i.y;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(x + i.w / 2, y - 2, i.w / 2, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#cfd8dc';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x + i.w / 2, y - i.h / 2 + 6, i.w / 2, Math.PI, 0);
+    ctx.lineTo(x + i.w, y - 2);
+    ctx.lineTo(x, y - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = '#b0bec5';
+    ctx.lineWidth = 1;
+    for (let row = 0; row < 4; row++) {
+      const ly = y - i.h / 2 + 6 + row * 8;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, ly);
+      ctx.lineTo(x + i.w - 4, ly);
+      ctx.stroke();
+    }
+    for (let col = 1; col < 5; col++) {
+      const lx = x + (i.w / 5) * col;
+      const top = y - i.h / 2 + Math.abs(lx - (x + i.w / 2)) / (i.w / 2) * (i.h / 2 - 6);
+      const bot = y - 4;
+      ctx.beginPath();
+      ctx.moveTo(lx, top);
+      ctx.lineTo(lx, bot);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = '#263238';
+    ctx.beginPath();
+    ctx.arc(x + i.w / 2, y - 4, 8, Math.PI, 0);
+    ctx.lineTo(x + i.w / 2 + 8, y - 2);
+    ctx.lineTo(x + i.w / 2 - 8, y - 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawSnowman(s) {
+    const x = s.x, y = s.y;
+    const cx = x + s.w / 2;
+    ctx.save();
+
+    // ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(cx, y - 1, s.w / 2.2, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const bodyR = s.w * 0.42;
+    const headR = s.w * 0.28;
+    const bodyCY = y - bodyR - 4;
+    const headCY = bodyCY - bodyR - headR * 0.6;
+
+    // body
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#b0bec5';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, bodyCY, bodyR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // head
+    ctx.beginPath();
+    ctx.arc(cx, headCY, headR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // hat (bucket)
+    ctx.fillStyle = '#263238';
+    ctx.beginPath();
+    ctx.ellipse(cx, headCY - headR * 0.2, headR * 0.95, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(cx - headR * 0.55, headCY - headR * 1.2, headR * 1.1, headR * 1.0);
+    ctx.fillStyle = '#e94560';
+    ctx.fillRect(cx - headR * 0.7, headCY - headR * 1.25, headR * 1.4, 4);
+
+    // eyes
+    ctx.fillStyle = '#263238';
+    ctx.beginPath();
+    ctx.arc(cx - headR * 0.35, headCY - 2, 2.2, 0, Math.PI * 2);
+    ctx.arc(cx + headR * 0.35, headCY - 2, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // carrot nose
+    ctx.fillStyle = '#ff8c00';
+    ctx.beginPath();
+    ctx.moveTo(cx - 2, headCY + 2);
+    ctx.lineTo(cx + headR * 0.9, headCY + 4);
+    ctx.lineTo(cx - 2, headCY + 6);
+    ctx.closePath();
+    ctx.fill();
+
+    // mouth (dots)
+    ctx.fillStyle = '#263238';
+    [[-5, 4], [-1, 5], [3, 5]].forEach(([dx, dy]) => {
+      ctx.beginPath();
+      ctx.arc(cx + dx, headCY + dy, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // arms (sticks)
+    ctx.strokeStyle = '#6d4c41';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - bodyR + 2, bodyCY - 4);
+    ctx.lineTo(cx - bodyR - 14, bodyCY - 14);
+    ctx.lineTo(cx - bodyR - 20, bodyCY - 18);
+    ctx.moveTo(cx + bodyR - 2, bodyCY - 4);
+    ctx.lineTo(cx + bodyR + 14, bodyCY - 14);
+    ctx.lineTo(cx + bodyR + 20, bodyCY - 18);
+    ctx.stroke();
+
+    // buttons
+    ctx.fillStyle = '#263238';
+    [[0, 0], [0, -8], [0, 8]].forEach(([dx, dy]) => {
+      ctx.beginPath();
+      ctx.arc(cx + dx, bodyCY + dy, 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.restore();
+  }
+
+  function drawPineTree(p) {
+    const x = p.x, y = p.y;
+    const cx = x + p.w / 2;
+    const trunkW = p.w * 0.22;
+    const trunkH = p.h * 0.22;
+    ctx.save();
+
+    // ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(cx, y - 1, p.w / 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // trunk
+    ctx.fillStyle = '#6d4c41';
+    ctx.fillRect(cx - trunkW / 2, y - trunkH, trunkW, trunkH);
+
+    // snow cap on top
+    // 3 triangle tiers
+    const tiers = 3;
+    const topY = y - p.h + 4;
+    const botY = y - trunkH;
+    const tierH = (botY - topY) / tiers;
+    for (let i = 0; i < tiers; i++) {
+      const baseY = botY - i * tierH;
+      const baseW = p.w * (0.4 + i * 0.2);
+      const tipY = baseY - tierH + 4;
+      ctx.fillStyle = '#2e7d32';
+      ctx.beginPath();
+      ctx.moveTo(cx, tipY);
+      ctx.lineTo(cx + baseW / 2, baseY);
+      ctx.lineTo(cx - baseW / 2, baseY);
+      ctx.closePath();
+      ctx.fill();
+      // snow on edges
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(cx, tipY);
+      ctx.lineTo(cx + baseW / 2 - 2, baseY - 2);
+      ctx.lineTo(cx - 2, baseY - 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(cx - baseW / 2 + 2, baseY);
+      ctx.lineTo(cx - baseW / 2 + 6, baseY + 2);
+      ctx.lineTo(cx + baseW / 2 - 6, baseY + 2);
+      ctx.lineTo(cx + baseW / 2 - 2, baseY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ornaments
+    ctx.fillStyle = '#e94560';
+    const orn = [
+      [0, 0.3], [-0.25, 0.55], [0.25, 0.55], [0, 0.78]
+    ];
+    orn.forEach(([dx, ty]) => {
+      const oy = botY - tierH * (1 - ty) - tierH;
+      ctx.beginPath();
+      ctx.arc(cx + dx * p.w, oy, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // star on top
+    ctx.fillStyle = '#ffd93d';
+    ctx.beginPath();
+    const sx = cx, sy = y - p.h + 2;
+    ctx.moveTo(sx, sy - 5);
+    ctx.lineTo(sx + 3, sy - 1);
+    ctx.lineTo(sx + 6, sy);
+    ctx.lineTo(sx + 3, sy + 2);
+    ctx.lineTo(sx + 1, sy + 6);
+    ctx.lineTo(sx - 1, sy + 6);
+    ctx.lineTo(sx - 3, sy + 2);
+    ctx.lineTo(sx - 6, sy);
+    ctx.lineTo(sx - 3, sy - 1);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawCloud(c) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.w / 6, 0, Math.PI * 2);
+    ctx.arc(c.x + c.w / 4, c.y - 6, c.w / 5, 0, Math.PI * 2);
+    ctx.arc(c.x + c.w / 2.5, c.y, c.w / 6, 0, Math.PI * 2);
+    ctx.arc(c.x + c.w / 1.5, c.y + 4, c.w / 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawGround() {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    ctx.fillStyle = '#eceff1';
+    ctx.fillRect(0, GROUND_Y, W, 4);
+    ctx.strokeStyle = '#cfd8dc';
+    ctx.setLineDash([4, 8]);
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y + 14);
+    ctx.lineTo(W, GROUND_Y + 14);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawBirthday() {
+    if (messageAlpha <= 0) return;
+    ctx.save();
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.55 * messageAlpha})`;
+    ctx.fillRect(0, 0, W, H);
+
+    const cx = W / 2, cy = H / 2;
+    const scale = 1 + (1 - messageAlpha) * 0.4;
+
+    if (wonByScore) {
+      // confetti only on win
+      for (let i = 0; i < 30; i++) {
+        const a = (frame / 30 + i) % (Math.PI * 2);
+        const rx = cx + Math.cos(a + i) * 180;
+        const ry = cy + Math.sin(a * 1.7 + i) * 90;
+        ctx.fillStyle = ['#e94560', '#f8b500', '#16c79a', '#ffd93d', '#6bc9ff'][i % 5];
+        ctx.globalAlpha = messageAlpha * (0.7 + Math.sin(frame / 8 + i) * 0.3);
+        ctx.fillRect(rx, ry, 6, 10);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    if (wonByScore) {
+      ctx.fillStyle = `rgba(233, 69, 96, ${0.5 * messageAlpha})`;
+      ctx.font = 'bold 56px -apple-system, sans-serif';
+      ctx.fillText('FELIÇ ANIVERSARI', 4, 4);
+      ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha})`;
+      ctx.fillText('FELIÇ ANIVERSARI', 0, 0);
+
+      ctx.font = '20px -apple-system, sans-serif';
+      ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.9})`;
+      ctx.fillText('ho has aconseguit! 🎉', 0, -50);
+    } else {
+      ctx.font = '54px -apple-system, sans-serif';
+      ctx.fillText('😢', -90, 0);
+
+      ctx.fillStyle = `rgba(233, 69, 96, ${0.5 * messageAlpha})`;
+      ctx.font = 'bold 52px -apple-system, sans-serif';
+      ctx.fillText('oh no! game over', 4, -4);
+      ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha})`;
+      ctx.fillText('oh no! game over', 0, -8);
+
+      ctx.font = '18px -apple-system, sans-serif';
+      ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.9})`;
+      ctx.fillText('el pinguí està trist 😢', 0, 28);
+    }
+
+    ctx.font = '14px -apple-system, sans-serif';
+    ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.85})`;
+    ctx.fillText('clica / toca / espai per tornar a jugar', 0, 50);
+
+    ctx.restore();
+  }
+
+  function update() {
+    if (!running) return;
+    frame++;
+
+    penguin.vy += GRAVITY;
+    penguin.y += penguin.vy;
+    if (penguin.y >= GROUND_Y) {
+      penguin.y = GROUND_Y;
+      penguin.vy = 0;
+      penguin.jumpCount = 0;
+    }
+    penguin.runPhase += 0.35;
+
+    const last = obstacles[obstacles.length - 1];
+    const minGap = 180;
+    const farEnough = !last || last.x < W - minGap;
+    if (frame % Math.max(40, 70 - score / 5) === 0 && farEnough) spawnObstacle();
+
+    for (const o of obstacles) o.x -= speed;
+    while (obstacles.length && obstacles[0].x + obstacles[0].w < -20) {
+      obstacles.shift();
+      score += 10;
+    }
+
+    for (const c of clouds) {
+      c.x -= speed * 0.3;
+      if (c.x < -80) c.x = W + 80;
+    }
+
+    for (const s of snowflakes) {
+      s.x += s.drift - speed * 0.2;
+      s.y += s.vy;
+      if (s.y > H) { s.y = -5; s.x = Math.random() * W; }
+      if (s.x < -5) s.x = W;
+    }
+
+    speed = 6 + score / 80;
+    scoreEl.textContent = score;
+
+    // win: reach WIN_SCORE
+    if (score >= WIN_SCORE) {
+      running = false;
+      finished = true;
+      wonByScore = true;
+    }
+
+    // collision (slightly forgiving hitbox)
+    const pBox = { x: penguin.x + 6, y: penguin.y - penguin.h + 6, w: penguin.w - 12, h: penguin.h - 6 };
+    for (const o of obstacles) {
+      const oBox = { x: o.x + 4, y: o.y - o.h + 4, w: o.w - 8, h: o.h };
+      if (rectsOverlap(pBox, oBox)) {
+        running = false;
+        finished = true;
+        wonByScore = false;
+        break;
+      }
+    }
+
+    if (finished && score > best) {
+      best = score;
+      localStorage.setItem('penguin-best', best);
+      bestEl.textContent = best;
+    }
+  }
+
+  function loop() {
+    update();
+
+    // background
+    const grd = ctx.createLinearGradient(0, 0, 0, H);
+    grd.addColorStop(0, '#87ceeb');
+    grd.addColorStop(0.7, '#e0f7ff');
+    grd.addColorStop(1, '#ffffff');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    for (const c of clouds) drawCloud(c);
+    for (const s of snowflakes) {
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    drawGround();
+    for (const o of obstacles) drawObstacle(o);
+    drawPenguin(penguin);
+
+    if (finished) {
+      if (messageAlpha < 1) messageAlpha = Math.min(1, messageAlpha + 0.04);
+      drawBirthday();
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') {
+      e.preventDefault();
+      jump();
+    }
+  });
+  canvas.addEventListener('mousedown', jump);
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); jump(); }, { passive: false });
+
+  reset();
+  loop();
+})();
+</script>
+</body>
+</html>
