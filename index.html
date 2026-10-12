@@ -28,14 +28,17 @@
     max-width: 100%;
   }
   h1 {
-    font-size: 18px;
+    font-size: 26px;
     text-align: center;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     color: #e94560;
     letter-spacing: 2px;
   }
   canvas {
     display: block;
+    width: 100%;
+    height: auto;
+    max-width: 1000px;
     background: linear-gradient(to bottom, #87ceeb 0%, #b0e0e6 70%, #fff 100%);
     border-radius: 8px;
     cursor: pointer;
@@ -43,19 +46,19 @@
   .hud {
     display: flex;
     justify-content: space-between;
-    margin-top: 10px;
-    font-size: 14px;
+    margin-top: 14px;
+    font-size: 20px;
     color: #aaa;
   }
   .hud span b { color: #fff; }
-  .hint { text-align: center; font-size: 12px; color: #888; margin-top: 6px; }
+  .hint { text-align: center; font-size: 18px; color: #bbb; margin-top: 10px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="game-card">
     <h1>PINGÜÍ ANIVERSARI</h1>
-    <canvas id="game" width="800" height="300"></canvas>
+    <canvas id="game" width="1000" height="420"></canvas>
     <div class="hud">
       <span>Punts: <b id="score">0</b> / <span id="goal">100</span></span>
       <span>Rècord: <b id="best">0</b></span>
@@ -73,9 +76,9 @@
   const W = canvas.width;
   const H = canvas.height;
 
-  const GROUND_Y = H - 60;
-  const GRAVITY = 0.6;
-  const JUMP_V = -12;
+  const GROUND_Y = H - 80;
+  const GRAVITY = 0.55;
+  const JUMP_V = -13;
   const WIN_SCORE = 100;
 
   const goalEl = document.getElementById('goal');
@@ -97,12 +100,12 @@
   bestEl.textContent = best;
 
   function reset() {
-    penguin = { x: 80, y: GROUND_Y, vy: 0, w: 44, h: 56, jumpCount: 0, runPhase: 0 };
+    penguin = { x: 90, y: GROUND_Y, vy: 0, w: 60, h: 76, jumpCount: 0, runPhase: 0 };
     obstacles = [];
     clouds = [];
     snowflakes = [];
     score = 0;
-    speed = 6;
+    speed = 3.5;
     frame = 0;
     running = true;
     finished = false;
@@ -127,13 +130,13 @@
     const type = types[Math.floor(Math.random() * types.length)];
     let w, h;
     if (type === 'igloo') {
-      h = 40 + Math.random() * 24;
-      w = 50 + Math.random() * 18;
+      h = 56 + Math.random() * 28;
+      w = 70 + Math.random() * 22;
     } else if (type === 'snowman') {
-      h = 50 + Math.random() * 22;
+      h = 70 + Math.random() * 28;
       w = h * 0.8;
     } else {
-      h = 54 + Math.random() * 28;
+      h = 78 + Math.random() * 36;
       w = h * 0.55;
     }
     obstacles.push({ x: W + 20, y: GROUND_Y, w, h, type });
@@ -179,47 +182,47 @@
     // head
     ctx.fillStyle = '#0a0a0a';
     ctx.beginPath();
-    ctx.arc(x + p.w / 2, y - p.h - 2, 14, 0, Math.PI * 2);
+    ctx.arc(x + p.w / 2, y - p.h - 2, 19, 0, Math.PI * 2);
     ctx.fill();
 
     // face
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(x + p.w / 2 + 5, y - p.h - 2, 6, 0, Math.PI * 2);
+    ctx.arc(x + p.w / 2 + 7, y - p.h - 2, 8, 0, Math.PI * 2);
     ctx.fill();
 
     // eyes (sad X when crashed)
     const sad = finished && !wonByScore;
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     if (sad) {
-      const ex = x + p.w / 2 + 6, ey = y - p.h - 3;
+      const ex = x + p.w / 2 + 8, ey = y - p.h - 3;
       ctx.beginPath();
-      ctx.moveTo(ex - 2.5, ey - 2.5); ctx.lineTo(ex + 2.5, ey + 2.5);
-      ctx.moveTo(ex + 2.5, ey - 2.5); ctx.lineTo(ex - 2.5, ey + 2.5);
+      ctx.moveTo(ex - 3.5, ey - 3.5); ctx.lineTo(ex + 3.5, ey + 3.5);
+      ctx.moveTo(ex + 3.5, ey - 3.5); ctx.lineTo(ex - 3.5, ey + 3.5);
       ctx.stroke();
     } else {
       ctx.fillStyle = '#000';
       ctx.beginPath();
-      ctx.arc(x + p.w / 2 + 6, y - p.h - 3, 2, 0, Math.PI * 2);
+      ctx.arc(x + p.w / 2 + 8, y - p.h - 3, 2.7, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // frown when sad
     if (sad) {
       ctx.strokeStyle = '#000';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(x + p.w / 2 + 12, y - p.h + 6, 6, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.arc(x + p.w / 2 + 16, y - p.h + 8, 8, Math.PI * 0.15, Math.PI * 0.85);
       ctx.stroke();
     }
 
     // beak
     ctx.fillStyle = '#ff8c00';
     ctx.beginPath();
-    ctx.moveTo(x + p.w / 2 + 10, y - p.h - 1);
-    ctx.lineTo(x + p.w / 2 + 20, y - p.h + 1);
-    ctx.lineTo(x + p.w / 2 + 10, y - p.h + 3);
+    ctx.moveTo(x + p.w / 2 + 14, y - p.h - 1);
+    ctx.lineTo(x + p.w / 2 + 28, y - p.h + 1);
+    ctx.lineTo(x + p.w / 2 + 14, y - p.h + 4);
     ctx.closePath();
     ctx.fill();
 
@@ -228,27 +231,27 @@
     const onGround = p.y >= GROUND_Y - 0.5;
     const footBaseY = p.y - 2;
     const wiggle = Math.sin(p.runPhase);
-    const leftFootY = footBaseY + (onGround ? wiggle * 3 : -6 + wiggle * 4);
-    const rightFootY = footBaseY + (onGround ? -wiggle * 3 : -6 - wiggle * 4);
+    const leftFootY = footBaseY + (onGround ? wiggle * 4 : -8 + wiggle * 5);
+    const rightFootY = footBaseY + (onGround ? -wiggle * 4 : -8 - wiggle * 5);
     const leftBack = onGround ? wiggle > 0.3 : true;
     const rightBack = onGround ? wiggle < -0.3 : true;
     ctx.beginPath();
-    ctx.ellipse(x + p.w / 2 - 8, leftFootY, 7, leftBack ? 4 : 2.5, 0, 0, Math.PI * 2);
-    ctx.ellipse(x + p.w / 2 + 8, rightFootY, 7, rightBack ? 4 : 2.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + p.w / 2 - 11, leftFootY, 10, leftBack ? 5 : 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + p.w / 2 + 11, rightFootY, 10, rightBack ? 5 : 3, 0, 0, Math.PI * 2);
     ctx.fill();
     if (onGround && Math.abs(wiggle) > 0.7) {
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.beginPath();
-      const fx = wiggle > 0 ? x + p.w / 2 - 8 : x + p.w / 2 + 8;
-      ctx.ellipse(fx, GROUND_Y + 3, 5, 1.5, 0, 0, Math.PI * 2);
+      const fx = wiggle > 0 ? x + p.w / 2 - 11 : x + p.w / 2 + 11;
+      ctx.ellipse(fx, GROUND_Y + 3, 7, 2, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // wing
     ctx.fillStyle = '#222';
-    const wingY = y - p.h / 2 - 4 + Math.sin(frame / 6) * 1.5;
+    const wingY = y - p.h / 2 - 6 + Math.sin(frame / 6) * 2;
     ctx.beginPath();
-    ctx.ellipse(x + p.w - 4, wingY, 5, 14, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(x + p.w - 5, wingY, 7, 19, 0.2, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -530,34 +533,31 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    if (wonByScore) {
+if (wonByScore) {
       ctx.fillStyle = `rgba(233, 69, 96, ${0.5 * messageAlpha})`;
-      ctx.font = 'bold 56px -apple-system, sans-serif';
+      ctx.font = 'bold 72px -apple-system, sans-serif';
       ctx.fillText('FELIÇ ANIVERSARI', 4, 4);
       ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha})`;
       ctx.fillText('FELIÇ ANIVERSARI', 0, 0);
 
-      ctx.font = '20px -apple-system, sans-serif';
+      ctx.font = '26px -apple-system, sans-serif';
       ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.9})`;
-      ctx.fillText('ho has aconseguit! 🎉', 0, -50);
+      ctx.fillText('ho has aconseguit! 🎉', 0, -60);
     } else {
-      ctx.font = '54px -apple-system, sans-serif';
-      ctx.fillText('😢', -90, 0);
-
       ctx.fillStyle = `rgba(233, 69, 96, ${0.5 * messageAlpha})`;
-      ctx.font = 'bold 52px -apple-system, sans-serif';
-      ctx.fillText('oh no! game over', 4, -4);
+      ctx.font = 'bold 68px -apple-system, sans-serif';
+      ctx.fillText('oh no! game over 😢', 4, -4);
       ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha})`;
-      ctx.fillText('oh no! game over', 0, -8);
+      ctx.fillText('oh no! game over 😢', 0, -8);
 
-      ctx.font = '18px -apple-system, sans-serif';
+      ctx.font = '24px -apple-system, sans-serif';
       ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.9})`;
-      ctx.fillText('el pinguí està trist 😢', 0, 28);
+      ctx.fillText('el pinguí està trist', 0, 32);
     }
 
-    ctx.font = '14px -apple-system, sans-serif';
+    ctx.font = '18px -apple-system, sans-serif';
     ctx.fillStyle = `rgba(255, 255, 255, ${messageAlpha * 0.85})`;
-    ctx.fillText('clica / toca / espai per tornar a jugar', 0, 50);
+    ctx.fillText('clica / toca / espai per tornar a jugar', 0, 60);
 
     ctx.restore();
   }
@@ -576,9 +576,9 @@
     penguin.runPhase += 0.35;
 
     const last = obstacles[obstacles.length - 1];
-    const minGap = 180;
+    const minGap = 240;
     const farEnough = !last || last.x < W - minGap;
-    if (frame % Math.max(40, 70 - score / 5) === 0 && farEnough) spawnObstacle();
+    if (frame % Math.max(85, 130 - score / 3) === 0 && farEnough) spawnObstacle();
 
     for (const o of obstacles) o.x -= speed;
     while (obstacles.length && obstacles[0].x + obstacles[0].w < -20) {
@@ -598,7 +598,7 @@
       if (s.x < -5) s.x = W;
     }
 
-    speed = 6 + score / 80;
+    speed = 3.5 + score / 150;
     scoreEl.textContent = score;
 
     // win: reach WIN_SCORE
