@@ -112,6 +112,7 @@
   let finished;
   let wonByScore;
   let messageAlpha;
+  let nextObstacleFrame;
 
   function reset() {
     penguin = { x: 90, y: GROUND_Y, vy: 0, w: 60, h: 76, jumpCount: 0, runPhase: 0 };
@@ -125,6 +126,7 @@
     finished = false;
     wonByScore = false;
     messageAlpha = 0;
+    nextObstacleFrame = 110;
     for (let i = 0; i < 4; i++) {
       clouds.push({ x: Math.random() * W, y: 30 + Math.random() * 80, w: 60 + Math.random() * 60 });
     }
@@ -600,7 +602,10 @@
     const last = obstacles[obstacles.length - 1];
     const minGap = 210;
     const farEnough = !last || last.x < W - minGap;
-    if (frame % Math.max(70, 110 - score / 3) === 0 && farEnough) spawnObstacle();
+    if (frame >= nextObstacleFrame && farEnough) {
+      spawnObstacle();
+      nextObstacleFrame = frame + Math.max(70, 110 - score / 3);
+    }
 
     for (const o of obstacles) o.x -= speed;
     while (obstacles.length && obstacles[0].x + obstacles[0].w < -20) {
