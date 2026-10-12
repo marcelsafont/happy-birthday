@@ -125,13 +125,13 @@
     const type = types[Math.floor(Math.random() * types.length)];
     let w, h;
     if (type === 'igloo') {
-      h = 56 + Math.random() * 28;
-      w = 70 + Math.random() * 22;
+      h = 40 + Math.random() * 18;
+      w = 50 + Math.random() * 16;
     } else if (type === 'snowman') {
-      h = 70 + Math.random() * 28;
+      h = 50 + Math.random() * 20;
       w = h * 0.8;
     } else {
-      h = 78 + Math.random() * 36;
+      h = 56 + Math.random() * 24;
       w = h * 0.55;
     }
     obstacles.push({ x: W + 20, y: GROUND_Y, w, h, type });
